@@ -4,7 +4,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>BTC ETF‑Short Stress Monitor</title>
   <style>
-    :root{--bg:#f5f7fa;--card:#fff;--txt:#111;--shadow:0 2px 8px rgba(0,0,0,.1)}*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt)}header{background:var(--txt);color:#fff;padding:1rem;text-align:center}main{padding:1rem;max-width:820px;margin:auto}.card{background:var(--card);border-radius:1rem;box-shadow:var(--shadow);padding:1.4rem;margin:1rem 0}.score{font-size:4rem;font-weight:700;margin:0}.ampel{display:inline-block;width:1.1rem;height:1.1rem;border-radius:50%;vertical-align:middle;margin-right:.4rem}.green{background:#39b54a}.yellow{background:#f0c200}.orange{background:#ff7f00}.red{background:#e10600}label{display:block;margin:.6rem 0 .2rem;font-weight:600}input[type=time]{font-size:1rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:.4rem;width:8rem}button{cursor:pointer;background:var(--txt);color:#fff;padding:.55rem 1.1rem;border:none;border-radius:.55rem;font-size:1rem;margin-top:.7rem}footer{padding:1rem;text-align:center;font-size:.8rem;color:#666}#debugOut{max-height:280px;overflow:auto;background:#000;color:#0f0;font-family:monospace;font-size:.75rem;padding:.6rem;border-radius:.5rem}
+    :root{--bg:#f5f7fa;--card:#fff;--txt:#111;--shadow:0 2px 8px rgba(0,0,0,.1)}*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt)}header{background:var(--txt);color:#fff;text-align:center;padding:1rem}main{padding:1rem;max-width:820px;margin:auto}.card{background:var(--card);border-radius:1rem;box-shadow:var(--shadow);padding:1.4rem;margin:1rem 0}.score{font-size:4rem;font-weight:700;margin:0}.ampel{display:inline-block;width:1.1rem;height:1.1rem;border-radius:50%;vertical-align:middle;margin-right:.4rem}.green{background:#39b54a}.yellow{background:#f0c200}.orange{background:#ff7f00}.red{background:#e10600}label{display:block;margin:.6rem 0 .2rem;font-weight:600}input[type=time]{font-size:1rem;padding:.35rem .6rem;border:1px solid #ccc;border-radius:.4rem;width:8rem}button{cursor:pointer;background:var(--txt);color:#fff;padding:.55rem 1.1rem;border:none;border-radius:.55rem;font-size:1rem;margin-top:.7rem}footer{padding:1rem;text-align:center;font-size:.8rem;color:#666}#debug{max-height:280px;overflow:auto;background:#000;color:#0f0;font-family:monospace;font-size:.75rem;padding:.6rem;border-radius:.5rem}
   </style>
 </head>
 <body>
@@ -14,44 +14,38 @@
     <div><span id="ampel" class="ampel green"></span><strong>Stress Score</strong></div>
     <p id="score" class="score">0</p>
     <p id="details">Waiting for first update …</p>
-  </section>  <section class="card">
-    <h2>Settings</h2>
+  </section>  <section class="card"><h2>Settings</h2>
     <label for="runTime">Daily refresh time</label>
     <input id="runTime" type="time" step="60"/>
     <button id="saveBtn">Save & schedule</button>
-    <p id="nextRunInfo" style="font-size:.9rem;color:#555"></p>
-  </section>  <section class="card">
-    <h2>Debug Log</h2>
-    <pre id="debugOut">(empty)</pre>
+    <p id="nextRun" style="font-size:.9rem;color:#555"></p>
+  </section>  <section class="card"><h2>Debug Log</h2>
+    <pre id="debug">(empty)</pre>
     <button id="copyLog">Copy log</button>
   </section>
 </main>
-<footer>
-  Public data (Farside, Fintel, iShares, CoinGecko) · MIT © 2025
-</footer>
+<footer>Public data (Farside, Fintel, iShares, CoinGecko) · MIT © 2025</footer>
 <script>
 (async()=>{
-/* ===== Logger ===== */
-const logBuf=[], dbg=id=>document.getElementById(id);
-function log(label,data){logBuf.push({ts:new Date().toISOString(),label,data});if(logBuf.length>400)logBuf.shift();const out=dbg('debugOut');out.textContent=logBuf.map(l=>`${l.ts} :: ${l.label} :: ${JSON.stringify(l.data)}`).join('\n');out.scrollTop=out.scrollHeight;}dbg('copyLog').onclick=()=>navigator.clipboard.writeText(dbg('debugOut').textContent).then(()=>alert('Log copied')).catch(e=>alert('Copy failed:'+e));
+  /* === tiny logger === */
+  const buf=[],out=id=>document.getElementById(id);
+  const LOG_LIMIT=400;
+  function log(label,data){buf.push({t:new Date().toISOString(),label,data});if(buf.length>LOG_LIMIT)buf.shift();const el=out('debug');el.textContent=buf.map(l=>`${l.t} :: ${l.label} :: ${JSON.stringify(l.data)}`).join('\n');el.scrollTop=el.scrollHeight;}
+  out('copyLog').onclick=()=>navigator.clipboard.writeText(out('debug').textContent).then(()=>alert('copied'));/* === manifest & SW === */ const mf={name:'BTC ETF‑Stress',short_name:'BTC Stress',start_url:'./',display:'standalone',theme_color:'#111',background_color:'#fff'}; const link=document.createElement('link');link.rel='manifest';link.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'}));document.head.appendChild(link);log('manifest','injected'); const sw="const C='btc-stress-4';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./']))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(caches.delete)))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));"; try{await navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'text/javascript'})));log('SW','registered');}catch(e){log('SW err',e);}
 
-/* ===== Manifest & SW ===== */ const manifest={name:'BTC ETF‑Stress',short_name:'BTC Stress',start_url:'./',display:'standalone',theme_color:'#111',background_color:'#fff'}; const m=document.createElement('link');m.rel='manifest';m.href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/json'}));document.head.appendChild(m);log('manifest','injected');
+/* === utils === */ const LS=localStorage, gid=id=>document.getElementById(id); const proxyWrap=[u=>https://cors.isomorphic-git.org/${u},u=>https://api.allorigins.win/raw?url=${encodeURIComponent(u)},u=>https://thingproxy.freeboard.io/fetch/${u}]; async function fetchAny(url){for(const wrap of proxyWrap){const u=wrap(url);log('fetch try',u);try{const r=await fetch(u);if(!r.ok)throw new Error(r.status);const txt=await r.text();log('fetch ok',u);return txt;}catch(err){log('fetch fail',{u,err:err+''});}} throw new Error('all proxies failed');} const safe=x=>Number.isFinite(x)?x:0;
 
-const swCode="const C='btc-stress-3';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./']))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k))))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));"; try{await navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'text/javascript'})));log('SW','registered');}catch(e){log('SW err',e);}
+/* === data sources === / async function getShort(){const csv=await fetchAny('https://fintel.io/ss/us/ibit?format=csv');const rows=csv.trim().split(/\n/);const last=rows.at(-1).split(',');const pct=parseFloat(last.at(-1).replace(/[^0-9.]/g,''));return safe(pct)/5;} async function getDiscount(){const txt=await fetchAny('https://query1.finance.yahoo.com/v8/finance/chart/IBIT?range=1d&interval=1d');const js=JSON.parse(txt);const close=js.chart.result[0].indicators.quote[0].close.pop();const nav=close1.001;return safe(Math.abs((close-nav)/nav)/0.005);}
+async function getOutflow(){ // primary: Farside JSON embedded try{const html=await fetchAny('https://farside.co.uk/bitcoin-etf-flow-all-data/');const m=html.match(/NEXT_DATA"[^>]>(.?)</script/);if(m){const data=JSON.parse(m[1]).props.pageProps.allData;const row=data.find(r=>r.ticker==='IBIT');const usd=parseFloat(row?.netflowUsd||0);return safe(Math.max(0,usd)/250e6);} } catch(e){log('farside parse fail',e);}
+// fallback: SoSoValue free API (last 1d): try{const json=await fetchAny('https://api.sosovalue.com/v1/sosovalue/etf/spot/history?currency=BTC&code=USA_IBIT&limit=1');const obj=JSON.parse(json);const usd=parseFloat(obj.data?.[0]?.flow_usd||0);return safe(Math.max(0,usd)/250e6);}catch(e){log('sosovalue fail',e);}
+return 0; // last resort }
 
-/* ===== Utils ===== */ const LS=localStorage;const byId=id=>document.getElementById(id); const proxies=[u=>https://cors.isomorphic-git.org/${u},u=>https://api.allorigins.win/raw?url=${encodeURIComponent(u)},u=>https://thingproxy.freeboard.io/fetch/${u}]; async function fetchChain(url){for(const wrap of proxies){const u=wrap(url);log('fetch try',u);try{const r=await fetch(u,{mode:'cors'});if(!r.ok)throw new Error(r.status);const t=await r.text();log('fetch ok',{u});return t;}catch(err){log('fetch fail',{u,err:err+''});}} throw new Error('all proxies failed');} function safe(x){return Number.isFinite(x)?x:0;}
+/* === scoring === */ const TH={g:39,y:59,o:79}; async function update(){log('update','start');gid('details').textContent='Updating…';try{const [sr,dc,of]=await Promise.all([getShort(),getDiscount(),getOutflow()]);let score=Math.round((sr+dc+of)*33.33);score=safe(Math.min(100,score));gid('score').textContent=score;const amp=gid('ampel');amp.className='ampel '+(score<=TH.g?'green':score<=TH.y?'yellow':score<=TH.o?'orange':'red');gid('details').textContent=ShortRatio=${(sr*5).toFixed(2)}% • |Discount|=${(dc*0.5).toFixed(2)}% • Outflow=$${(of*250).toFixed(1)}M;log('update ok',{sr,dc,of,score});}catch(e){gid('details').textContent='Update failed';log('update err',e);} }
 
-/* ===== Data Functions ===== */ async function shortRatio(){const csv=await fetchChain('https://fintel.io/ss/us/ibit?format=csv');const rows=csv.trim().split(/\n/);const head=rows[0].split(',');const idx=head.findIndex(h=>/float/i.test(h));const last=rows[rows.length-1].split(',');const pct=parseFloat(last[idx>=0?idx:4]);log('parsed short%float',pct);return safe(pct)/5;}
+/* === scheduling === / function minsToNext(t){const[h,m]=t.split(':').map(Number);const now=new Date();const next=new Date();next.setHours(h,m,0,0);if(next<=now)next.setDate(next.getDate()+1);return (next-now)/6e4;} function plan(){const t=LS.getItem('runTime');if(!t)return;const mins=minsToNext(t);gid('nextRun').textContent=Next update in ${(mins/60).toFixed(2)} h (${t});log('plan',mins);setTimeout(()=>{update();plan();},mins6e4);} gid('saveBtn').onclick=()=>{const t=gid('runTime').value;if(!t)return alert('Pick a time');LS.setItem('runTime',t);plan();alert('Saved');log('btn save',t);}
+const saved=LS.getItem('runTime');if(saved){gid('runTime').value=saved;plan();}
 
-async function discount(){const raw=await fetchChain('https://query1.finance.yahoo.com/v8/finance/chart/IBIT?range=1d&interval=1d');const js=JSON.parse(raw);const close=js.chart.result[0].indicators.quote[0].close.pop();const nav=close*1.001;return safe(Math.abs((close-nav)/nav)/0.005);}
-
-async function outflow(){const html=await fetchChain('https://farside.co.uk/bitcoin-etf-flow-all-data/');let usd=0;try{const jmatch=html.match(/id="NEXT_DATA"\stype="application/json">(.?)</script/);if(jmatch){const data=JSON.parse(jmatch[1]);const rows=data.props.pageProps.allData||[];const ibit=rows.find(r=>r.ticker==='IBIT');usd=parseFloat(ibit?ibit.netflowUsd:0);}else{const m=html.match(/IBIT[^\n]?([-0-9.]+)\s(?:<|,|$)/);usd=parseFloat(m?m[1]:0)*1e6;} }catch(e){log('outflow parse err',e);}return safe(Math.max(0,usd)/250e6);}
-
-/* ===== Main Update ===== */ const thresholds={g:39,y:59,o:79}; async function update(){log('update','start');byId('details').textContent='Updating…';try{const [sr,dc,of]=await Promise.all([shortRatio(),discount(),outflow()]);let sc=Math.round((safe(sr)+safe(dc)+safe(of))*33.33);sc=safe(Math.min(100,sc));const amp=byId('ampel');amp.className='ampel '+(sc<=thresholds.g?'green':sc<=thresholds.y?'yellow':sc<=thresholds.o?'orange':'red');byId('score').textContent=sc;byId('details').textContent=ShortRatio=${(sr*5).toFixed(2)}% • |Discount|=${(dc*0.5).toFixed(2)}% • Outflow=$${(of*250).toFixed(1)}M;LS.setItem('lastScore',sc);log('update ok',{sr,dc,of,sc});}catch(e){byId('details').textContent='Update failed';log('update err',e);} }
-
-/* ===== Scheduler ===== / function minsUntil(t){const[h,m]=t.split(':').map(Number);const now=new Date();const d=new Date();d.setHours(h,m,0,0);if(d<=now)d.setDate(d.getDate()+1);return (d-now)/6e4;} function plan(){const t=LS.getItem('runTime');if(!t)return;const mins=minsUntil(t);byId('nextRunInfo').textContent=Next update in ${(mins/60).toFixed(2)} h (${t});log('plan',mins);setTimeout(()=>{update();plan();},mins6e4);} byId('saveBtn').onclick=()=>{const t=byId('runTime').value;if(!t)return alert('Pick time');LS.setItem('runTime',t);plan();alert('Saved');log('btn save',t);} ; const saved=LS.getItem('runTime');if(saved){byId('runTime').value=saved;plan();}
-
-/* ===== Kick‑off ===== */ log('init','load');update(); })(); </script>
+/* === kick‑off === */ log('init','load');update(); })(); </script>
 
 </body>
 </html>

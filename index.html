@@ -1,158 +1,99 @@
 <!DOCTYPE html><html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>BTC ETF‑Short Stress Monitor</title>
-  <!-- Manifest & SW are injected at runtime so we can stay in ONE file -->
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BTC ETF‑Short Stress Monitor</title>
+  <!-- Manifest & SW injected at runtime so the whole PWA fits in ONE file -->
   <style>
-    body{font-family:system-ui,Arial,sans-serif;margin:0;padding:0;background:#f5f7fa;color:#111}
-    header{background:#111;color:#fff;padding:1rem 1.5rem;text-align:center}
-    main{padding:1rem 1.5rem;max-width:720px;margin:auto}
-    .card{background:#fff;border-radius:1rem;box-shadow:0 2px 8px rgba(0,0,0,.1);padding:1.5rem;margin-bottom:1.5rem}
+    :root{--bg:#f5f7fa;--card-bg:#fff;--txt:#111;--shadow:0 2px 8px rgba(0,0,0,.1)}
+    *{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+    header{background:var(--txt);color:#fff;padding:1rem 1.5rem;text-align:center}
+    main{padding:1rem 1.5rem;max-width:800px;margin:auto}
+    .card{background:var(--card-bg);border-radius:1rem;box-shadow:var(--shadow);padding:1.5rem;margin-bottom:1.5rem}
     .score{font-size:4rem;font-weight:700;margin:0}
     .ampel{display:inline-block;width:1.2rem;height:1.2rem;border-radius:50%;vertical-align:middle;margin-right:.4rem}
     .green{background:#39b54a}.yellow{background:#f0c200}.orange{background:#ff7f00}.red{background:#e10600}
-    label{display:block;margin:.6rem 0 .2rem;font-weight:600}
-    input[type="time"]{font-size:1rem;padding:.3rem .6rem;border-radius:.4rem;border:1px solid #ccc;width:8rem}
-    button{cursor:pointer;background:#111;color:#fff;padding:.5rem 1rem;border:none;border-radius:.5rem;font-size:1rem;margin-top:.6rem}
+    label{display:block;margin:.6rem 0 .2rem;font-weight:600}input[type="time"]{font-size:1rem;padding:.3rem .6rem;border-radius:.4rem;border:1px solid #ccc;width:8rem}
+    button{cursor:pointer;background:var(--txt);color:#fff;padding:.5rem 1rem;border:none;border-radius:.5rem;font-size:1rem;margin-top:.6rem}
     footer{padding:1rem;text-align:center;font-size:.8rem;color:#666}
+    /* Debug area */
+    #debugOutput{max-height:240px;overflow:auto;background:#000;color:#0f0;font-family:monospace;font-size:.75rem;padding:.5rem;border-radius:.5rem}
   </style>
 </head>
 <body>
-  <header>
-    <h1>BTC ETF‑Short Stress Monitor</h1>
-  </header>
+  <header><h1>BTC ETF‑Short Stress Monitor</h1></header>
   <main>
-    <section class="card" id="statusCard">
-      <div><span id="ampel" class="ampel green"></span><span style="font-weight:600">Stress Score</span></div>
-      <p class="score" id="score">0</p>
-      <p id="details">Waiting for first update …</p>
+    <section id="statusCard" class="card">
+      <div><span id="ampel" class="ampel green"></span><span style="font-weight:600">Stress Score</span></div>
+      <p id="score" class="score">0</p>
+      <p id="details">Waiting for first update …</p>
     </section><section class="card">
   <h2>Settings</h2>
   <label for="runTime">Daily refresh time</label>
-  <input id="runTime" type="time" step="60">
-  <button id="saveBtn">Save & schedule</button>
+  <input id="runTime" type="time" step="60"/>
+  <button id="saveBtn">Save &amp; schedule</button>
   <p id="nextRunInfo" style="font-size:.9rem;color:#555"></p>
 </section>
 
-  </main>  <footer>
-    Built with public data (Farside, Fintel, iShares, CoinGecko). CORS proxy may be required.<br>
-    Source MIT © 2025
+<section class="card">
+  <h2>Debug Log</h2>
+  <pre id="debugOutput">(log empty)</pre>
+  <button id="copyLogBtn">Copy log</button>
+</section>
+
+  </main>
+  <footer>
+    Built with public data (Farside, Fintel, iShares, CoinGecko). MIT © 2025. CORS proxy may be required.
   </footer><script>
 (async()=>{
+  /* ---------- GLOBAL DEBUG LOGGER ---------- */
+  const debug=[];
+  function log(label,data){const stamp=(new Date()).toISOString();debug.push({stamp,label,data});renderDebug();}
+  function renderDebug(){const out=document.getElementById('debugOutput');out.textContent=debug.map(l=>`${l.stamp} :: ${l.label} :: ${JSON.stringify(l.data)}`).join('\n');out.scrollTop=out.scrollHeight;}
+  document.getElementById('copyLogBtn').addEventListener('click',()=>{
+    navigator.clipboard.writeText(document.getElementById('debugOutput').textContent||'').then(()=>alert('Log copied 🎉')).catch(e=>alert('Copy failed:'+e));
+  });
+
   /* ---------- Helpers ---------- */
   const byId=id=>document.getElementById(id);
   const LS=localStorage;
+  log('init','page load');
 
   /* ---------- Manifest (runtime) ---------- */
-  const manifest={
-    name:"BTC ETF‑Short Stress Monitor",
-    short_name:"BTC Stress",
-    start_url:"./",
-    scope:"./",
-    display:"standalone",
-    background_color:"#ffffff",
-    theme_color:"#111111",
-    icons:[{src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABKUlEQ…",sizes:"192x192",type:"image/png"}]
-  };
-  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:"application/json"});
-  const mLink=document.createElement('link');
-  mLink.rel='manifest';
-  mLink.href=URL.createObjectURL(manifestBlob);
-  document.head.appendChild(mLink);
+  const manifest={name:'BTC ETF‑Short Stress Monitor',short_name:'BTC Stress',start_url:'./',scope:'./',display:'standalone',background_color:'#ffffff',theme_color:'#111111',icons:[{src:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQ...',sizes:'192x192',type:'image/png'}]};
+  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+  const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=URL.createObjectURL(manifestBlob);document.head.appendChild(mLink);log('manifest','injected');
 
-  /* ---------- Service Worker inline via Blob ---------- */
-  const swCode=`
-    const CACHE_NAME='btc-stress-v1';
-    const CORE=['./'];
-    self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(CORE))));
-    self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-    self.addEventListener('fetch',e=>{
-      e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});
-    // Periodic background sync (Chrome ≥ 108 PWAs)
-    self.addEventListener('periodicsync',e=>{
-      if(e.tag==='daily-fetch'){
-        e.waitUntil(self.registration.showNotification('BTC Stress','Background update running')); }
-    });`;
-  const swBlob=new Blob([swCode],{type:'text/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(swBlob));
+  /* ---------- Service Worker inline ---------- */
+  const swCode=`const CACHE='btc-stress-1';self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'text/javascript'}))).then(r=>log('SW registered',r.scope)).catch(e=>log('SW error',e));
 
-  /* ---------- Core logic ---------- */
+  /* ---------- Fetch wrapper with logging ---------- */
+  async function fetchWithLog(url,opts){log('fetch:start',{url,opts});try{const res=await fetch(url,opts);const txt=await res.text();log('fetch:done',{url,status:res.status});return txt;}catch(e){log('fetch:error',{url,error:e});throw e;}}
+
+  /* ---------- Data functions ---------- */
   const thresholds={green:39,yellow:59,orange:79};
 
-  async function fetchShortRatio(){
-    try{
-      // FINRA short-interest via Fintel CSV (delayed, but free). Use IBIT example.
-      const csv=await (await fetch('https://fintel.io/ss/us/ibit?format=csv')).text();
-      const lines=csv.trim().split(/\n/);
-      const last=lines[lines.length-1].split(',');
-      const pct=parseFloat(last[4]); // %Float column
-      return pct/5; // scaled as defined
-    }catch(e){console.error(e);return 0;}
-  }
+  async function fetchShortRatio(){log('fetchShortRatio:start',null);const csv=await fetchWithLog('https://cors.isomorphic-git.org/https://fintel.io/ss/us/ibit?format=csv');const last=csv.trim().split(/\n/).pop().split(',');const pct=parseFloat(last[4]);log('fetchShortRatio:result',pct);return pct/5;}
 
-  async function fetchDiscount(){
-    try{
-      const res=await fetch('https://query1.finance.yahoo.com/v8/finance/chart/IBIT');
-      const data=await res.json();
-      const close=data.chart.result[0].indicators.quote[0].close.pop();
-      const nav=close*1.001; // Placeholder; real NAV requires issuer CSV w/ prior NAV
-      const disc=Math.abs((close-nav)/nav);
-      return disc/0.005; // scaled
-    }catch(e){console.error(e);return 0;}
-  }
+  async function fetchDiscount(){log('fetchDiscount:start',null);try{const raw=await fetchWithLog('https://cors.isomorphic-git.org/https://query1.finance.yahoo.com/v8/finance/chart/IBIT?range=1d&interval=1d');const data=JSON.parse(raw);const close=data.chart.result[0].indicators.quote[0].close.pop();const nav=close*1.001;const disc=Math.abs((close-nav)/nav);log('fetchDiscount:result',disc);return disc/0.005;}catch(e){log('fetchDiscount:error',e);return 0;}}
 
-  async function fetchOutflow(){
-    try{
-      const table=await (await fetch('https://farside.co.uk/bitcoin-etf-flow-all-data/')).text();
-      const m=table.match(/IBIT.*?(?:\,|\n)([-0-9\.]+)$/m);
-      const out=parseFloat(m?m[1]:0)*1e6; // USD
-      return Math.max(0,out)/250e6; // negative = inflow treated 0
-    }catch(e){console.error(e);return 0;}
-  }
+  async function fetchOutflow(){log('fetchOutflow:start',null);try{const html=await fetchWithLog('https://cors.isomorphic-git.org/https://farside.co.uk/bitcoin-etf-flow-all-data/');const m=html.match(/IBIT.*?(?:,|\n)([-0-9\.]+)$/m);const out=parseFloat(m?m[1]:0)*1e6;log('fetchOutflow:result',out);return Math.max(0,out)/250e6;}catch(e){log('fetchOutflow:error',e);return 0;}}
 
-  async function updateScore(){
-    byId('details').textContent='Updating…';
-    const [sr,disc,out]=await Promise.all([fetchShortRatio(),fetchDiscount(),fetchOutflow()]);
-    let score=Math.round((sr+disc+out)*33.33); // rough normalize to 0‑100
-    score=Math.min(100,score);
-    byId('score').textContent=score;
-    const amp=byId('ampel');
-    if(score<=thresholds.green){amp.className='ampel green';}
-    else if(score<=thresholds.yellow){amp.className='ampel yellow';}
-    else if(score<=thresholds.orange){amp.className='ampel orange';}
-    else{amp.className='ampel red';}
-    byId('details').textContent=`ShortRatio=${(sr*5).toFixed(2)}% • |Discount|=${(disc*0.5).toFixed(2)}% • Outflow=$${(out*250).toFixed(1)}M`;
-    LS.setItem('lastScore',score);
-  }
+  async function updateScore(){log('updateScore:start',null);byId('details').textContent='Updating…';
+    try{const [sr,disc,out]=await Promise.all([fetchShortRatio(),fetchDiscount(),fetchOutflow()]);let score=Math.round((sr+disc+out)*33.33);score=Math.min(100,score);byId('score').textContent=score;const amp=byId('ampel');if(score<=thresholds.green){amp.className='ampel green';}else if(score<=thresholds.yellow){amp.className='ampel yellow';}else if(score<=thresholds.orange){amp.className='ampel orange';}else{amp.className='ampel red';}byId('details').textContent=`ShortRatio=${(sr*5).toFixed(2)}% • |Discount|=${(disc*0.5).toFixed(2)}% • Outflow=$${(out*250).toFixed(1)}M`;LS.setItem('lastScore',score);log('updateScore:done',{sr,disc,out,score});}
+    catch(e){byId('details').textContent='Update failed, see debug.';log('updateScore:error',e);} }
 
   /* ---------- Scheduling ---------- */
-  function minutesUntil(timeStr){
-    const [h,m]=timeStr.split(':').map(Number);
-    const now=new Date();
-    const target=new Date();target.setHours(h,m,0,0);
-    if(target<=now)target.setDate(target.getDate()+1);
-    return (target-now)/60000; // minutes
-  }
-  function scheduleNext(){
-    const t=LS.getItem('runTime');
-    if(!t)return;
-    const mins=minutesUntil(t);
-    byId('nextRunInfo').textContent=`Next auto‑update in ${(mins/60).toFixed(2)} h (${t})`;
-    setTimeout(()=>{updateScore();scheduleNext();},mins*60000);
-  }
+  function minutesUntil(timeStr){const [h,m]=timeStr.split(':').map(Number);const now=new Date();const target=new Date();target.setHours(h,m,0,0);if(target<=now)target.setDate(target.getDate()+1);return (target-now)/60000;}
+
+  function scheduleNext(){const t=LS.getItem('runTime');if(!t)return;const mins=minutesUntil(t);byId('nextRunInfo').textContent=`Next auto-update in ${(mins/60).toFixed(2)} h (${t})`;log('scheduleNext',{time:t,mins});setTimeout(()=>{updateScore();scheduleNext();},mins*60000);}
 
   /* ---------- UI bindings ---------- */
-  byId('saveBtn').addEventListener('click',()=>{
-    const t=byId('runTime').value;
-    if(!t)return alert('Select a time first');
-    LS.setItem('runTime',t);
-    scheduleNext();
-    alert('Saved! App will refresh daily at '+t);
-  });
+  byId('saveBtn').addEventListener('click',()=>{const t=byId('runTime').value;if(!t){alert('Select a time first');return;}LS.setItem('runTime',t);scheduleNext();alert('Saved! App will refresh daily at '+t);log('button:save',{time:t});});
+
   // restore settings
-  const savedTime=LS.getItem('runTime');
-  if(savedTime){byId('runTime').value=savedTime;scheduleNext();}
+  const savedTime=LS.getItem('runTime');if(savedTime){byId('runTime').value=savedTime;scheduleNext();}
 
   // Initial load
   updateScore();
